@@ -134,8 +134,15 @@ celerybeat.pid
 # SageMath parsed files
 *.sage.py
 
+# ML artifacts
+catboost_info/
+artifacts/
+logs/
+
+# Serialized models
+*.pkl
+
 # Environments
-.artifacts
 .env
 .envrc
 .venv

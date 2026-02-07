@@ -14,10 +14,14 @@ predict_pipeline = PredictPipeline()
 @app.route('/')
 def home():
 
-    # pop removes value after showing once
     result = session.pop('result', None)
+    form_data = session.pop('form_data', None)
 
-    return render_template('home.html', result=result)
+    return render_template(
+        'home.html',
+        result=result,
+        form_data=form_data
+    )
 
 
 @app.route('/predictdata', methods=['POST'])
@@ -25,25 +29,28 @@ def predict_datapoint():
 
     try:
 
+        # Save form values so they remain after prediction
+        form_data = request.form.to_dict()
+
         data = CustomData(
-            gender=request.form['gender'],
-            race_ethnicity=request.form['race_ethnicity'],
-            parental_level_of_education=request.form['parental_level_of_education'],
-            lunch=request.form['lunch'],
-            test_preparation_course=request.form['test_preparation_course'],
-            reading_score=float(request.form['reading_score']),
-            writing_score=float(request.form['writing_score']),
+            gender=form_data['gender'],
+            race_ethnicity=form_data['race_ethnicity'],
+            parental_level_of_education=form_data['parental_level_of_education'],
+            lunch=form_data['lunch'],
+            test_preparation_course=form_data['test_preparation_course'],
+            reading_score=float(form_data['reading_score']),
+            writing_score=float(form_data['writing_score']),
         )
 
         pred_df = data.get_data_as_data_frame()
 
         result = predict_pipeline.predict(pred_df)[0]
 
-        # Clamp result between 0–100
+        # Clamp between 0–100
         result = round(max(0, min(100, result)), 2)
 
-        # Store in session
         session['result'] = result
+        session['form_data'] = form_data
 
         return redirect(url_for('home'))
 

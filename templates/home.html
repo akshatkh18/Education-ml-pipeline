@@ -1,140 +1,145 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
-<meta charset="UTF-8">
+    <meta charset="UTF-8">
 
-<title>Student Exam Predictor</title>
+    <title>Student Exam Predictor</title>
 
-<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css"
-      rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
 
-<style>
+    <style>
+        body {
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
 
-body{
-    background: linear-gradient(135deg,#667eea,#764ba2);
-    min-height:100vh;
-    display:flex;
-    align-items:center;
-    justify-content:center;
-}
+        .card {
+            border: none;
+            border-radius: 18px;
+        }
 
-.card{
-    border:none;
-    border-radius:18px;
-}
-
-.prediction-box{
-    background:#eef2ff;
-    border-radius:12px;
-    padding:18px;
-    font-size:22px;
-    font-weight:600;
-}
-
-</style>
+        .prediction-box {
+            background: #eef2ff;
+            border-radius: 12px;
+            padding: 18px;
+            font-size: 22px;
+            font-weight: 600;
+        }
+    </style>
 </head>
 
 <body>
 
-<div class="container">
-<div class="row justify-content-center">
-<div class="col-lg-7">
+    <div class="container">
+        <div class="row justify-content-center">
+            <div class="col-lg-7">
 
-<div class="card shadow-lg p-4">
+                <div class="card shadow-lg p-4">
 
-<h2 class="text-center mb-4">
-Student Exam Performance Indicator
-</h2>
+                    <h2 class="text-center mb-4">
+                        Student Exam Performance Indicator
+                    </h2>
 
-<form action="/predictdata" method="post">
+                    <form action="/predictdata" method="post" onsubmit="document.getElementById('predictBtn').disabled=true;
+          document.getElementById('predictBtn').innerText='Predicting...';">
 
-<div class="row">
+                        <div class="row">
 
-<div class="col-md-6 mb-3">
-<label>Gender</label>
-<select class="form-select" name="gender" required>
-<option value="">Select</option>
-<option value="male">Male</option>
-<option value="female">Female</option>
-</select>
-</div>
+                            {% set f = form_data if form_data else {} %}
 
-<div class="col-md-6 mb-3">
-<label>Race / Ethnicity</label>
-<select class="form-select" name="race_ethnicity" required>
-<option value="">Select</option>
-<option value="group A">Group A</option>
-<option value="group B">Group B</option>
-<option value="group C">Group C</option>
-<option value="group D">Group D</option>
-<option value="group E">Group E</option>
-</select>
-</div>
+                            <div class="col-md-6 mb-3">
+                                <label>Gender</label>
+                                <select class="form-select" name="gender" required>
+                                    <option value="">Select</option>
+                                    <option value="male" {{ 'selected' if f.get('gender')=='male' else '' }}>Male
+                                    </option>
+                                    <option value="female" {{ 'selected' if f.get('gender')=='female' else '' }}>Female
+                                    </option>
+                                </select>
+                            </div>
 
-<div class="col-12 mb-3">
-<label>Parental Level of Education</label>
-<select class="form-select" name="parental_level_of_education" required>
-<option value="">Select</option>
-<option value="associate's degree">Associate's degree</option>
-<option value="bachelor's degree">Bachelor's degree</option>
-<option value="high school">High school</option>
-<option value="master's degree">Master's degree</option>
-<option value="some college">Some college</option>
-<option value="some high school">Some high school</option>
-</select>
-</div>
+                            <div class="col-md-6 mb-3">
+                                <label>Race / Ethnicity</label>
+                                <select class="form-select" name="race_ethnicity" required>
+                                    <option value="">Select</option>
+                                    {% for g in ['group A','group B','group C','group D','group E'] %}
+                                    <option value="{{g}}" {{ 'selected' if f.get('race_ethnicity')==g else '' }}>{{g}}
+                                    </option>
+                                    {% endfor %}
+                                </select>
+                            </div>
 
-<div class="col-md-6 mb-3">
-<label>Lunch Type</label>
-<select class="form-select" name="lunch" required>
-<option value="">Select</option>
-<option value="standard">Standard</option>
-<option value="free/reduced">Free / Reduced</option>
-</select>
-</div>
+                            <div class="col-12 mb-3">
+                                <label>Parental Education</label>
+                                <select class="form-select" name="parental_level_of_education" required>
+                                    <option value="">Select</option>
+                                    {% for e in ["associate's degree","bachelor's degree","high school","master's
+                                    degree","some college","some high school"] %}
+                                    <option value="{{e}}" {{ 'selected' if f.get('parental_level_of_education')==e
+                                        else '' }}>{{e}}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
 
-<div class="col-md-6 mb-3">
-<label>Test Preparation</label>
-<select class="form-select" name="test_preparation_course" required>
-<option value="">Select</option>
-<option value="none">None</option>
-<option value="completed">Completed</option>
-</select>
-</div>
+                            <div class="col-md-6 mb-3">
+                                <label>Lunch</label>
+                                <select class="form-select" name="lunch" required>
+                                    <option value="">Select</option>
+                                    <option value="standard" {{ 'selected' if f.get('lunch')=='standard' else '' }}>
+                                        Standard</option>
+                                    <option value="free/reduced" {{ 'selected' if f.get('lunch')=='free/reduced' else ''
+                                        }}>Free / Reduced</option>
+                                </select>
+                            </div>
 
-<div class="col-md-6 mb-3">
-<label>Reading Score</label>
-<input type="number" class="form-control"
-       name="reading_score" min="0" max="100" required>
-</div>
+                            <div class="col-md-6 mb-3">
+                                <label>Test Preparation</label>
+                                <select class="form-select" name="test_preparation_course" required>
+                                    <option value="">Select</option>
+                                    <option value="none" {{ 'selected' if f.get('test_preparation_course')=='none'
+                                        else '' }}>None</option>
+                                    <option value="completed" {{ 'selected' if
+                                        f.get('test_preparation_course')=='completed' else '' }}>Completed</option>
+                                </select>
+                            </div>
 
-<div class="col-md-6 mb-4">
-<label>Writing Score</label>
-<input type="number" class="form-control"
-       name="writing_score" min="0" max="100" required>
-</div>
+                            <div class="col-md-6 mb-3">
+                                <label>Reading Score</label>
+                                <input type="number" class="form-control" name="reading_score"
+                                    value="{{ f.get('reading_score','') }}" min="0" max="100" required>
+                            </div>
 
-</div>
+                            <div class="col-md-6 mb-4">
+                                <label>Writing Score</label>
+                                <input type="number" class="form-control" name="writing_score"
+                                    value="{{ f.get('writing_score','') }}" min="0" max="100" required>
+                            </div>
 
-<div class="d-grid">
-<button class="btn btn-primary btn-lg"
-onclick="this.disabled=true; this.innerText='Predicting...';">
-Predict Maths Score
-</button>
-</div>
+                        </div>
 
-</form>
+                        <div class="d-grid">
+                            <button id="predictBtn" type="submit" class="btn btn-primary btn-lg">
+                                Predict Maths Score
+                            </button>
+                        </div>
 
-{% if result %}
-<div class="prediction-box text-center mt-4">
-Predicted Maths Score: <strong>{{ result }}</strong>
-</div>
-{% endif %}
+                    </form>
 
-</div>
-</div>
-</div>
-</div>
+                    {% if result %}
+                    <div class="prediction-box text-center mt-4">
+                        Predicted Maths Score: <strong>{{ result }}</strong>
+                    </div>
+                    {% endif %}
+
+                </div>
+            </div>
+        </div>
+    </div>
 
 </body>
+
 </html>

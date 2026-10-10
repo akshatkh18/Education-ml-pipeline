@@ -1,236 +1,106 @@
-# Education ML Pipeline
+# Student Insight — Student Performance Prediction
 
-An end-to-end machine learning pipeline for educational data analysis and prediction. This project demonstrates a complete MLOps workflow from data ingestion to model deployment, built with industry best practices.
+A Flask application that estimates a student's mathematics score from reading and writing scores plus five background categories. The responsive interface includes accessible labels, retained form values, inline errors and a score panel. Assets are served locally with no CDN dependency.
 
-## 📋 Table of Contents
+## Local setup
 
-- [Overview](#overview)
-- [Features](#features)
-- [Project Structure](#project-structure)
-- [Installation](#installation)
-- [Usage](#usage)
-- [Pipeline Components](#pipeline-components)
-- [Technology Stack](#technology-stack)
-- [Model Performance](#model-performance)
-- [Web Application](#web-application)
-- [Contributing](#contributing)
-- [License](#license)
+Use Python 3.10 (the existing artifacts were verified with Python 3.10.15). From the repository root:
 
-## 🎯 Overview
-
-This project implements a production-ready machine learning pipeline designed to analyze and predict educational outcomes. The pipeline follows MLOps best practices, including modular code organization, automated data processing, model training, evaluation, and deployment through a web interface.
-
-## ✨ Features
-
-- **End-to-End ML Pipeline**: Complete workflow from data ingestion to model deployment
-- **Modular Architecture**: Well-structured codebase with separate components for each pipeline stage
-- **Web Interface**: Interactive Flask application for predictions
-- **Automated Workflows**: Streamlined data processing and model training
-- **Reproducibility**: Consistent results through versioned dependencies and structured code
-- **Scalable Design**: Easy to extend and modify for different datasets and use cases
-
-## 📁 Project Structure
-
-```
-Education-ml-pipeline/
-│
-├── artifacts/              # Saved models, preprocessors, and pipeline artifacts
-│
-├── notebook/              # Jupyter notebooks for EDA and experimentation
-│   └── data/             # Dataset storage
-│
-├── src/                   # Source code for the ML pipeline
-│   ├── components/       # Pipeline components (ingestion, transformation, training)
-│   ├── pipeline/         # Training and prediction pipelines
-│   └── utils.py          # Utility functions
-│
-├── templates/            # HTML templates for web application
-│
-├── app.py               # Flask web application
-├── setup.py             # Package setup and installation
-├── requirements.txt     # Python dependencies
-└── README.md           # Project documentation
+```powershell
+py -3.10 -m venv .venv
+.\.venv\Scripts\python.exe -m pip install -r requirements.txt
+.\.venv\Scripts\python.exe app.py
 ```
 
-## 🚀 Installation
+Open http://127.0.0.1:5000. On macOS/Linux, use `python3.10 -m venv .venv` and `.venv/bin/python` instead. `PORT` optionally changes the local port. Debug mode is disabled.
 
-### Prerequisites
+This checkout also has a Conda-style environment at `venv`: its interpreter is `.\venv\python.exe`, not `venv\Scripts\python.exe`. It was used for verification. The global Anaconda interpreter has scikit-learn 1.6.1 and must not be used with these artifacts without installing the pinned requirements.
 
-- Python 3.8 or higher
-- pip package manager
-- Virtual environment (recommended)
+## Model and input contract
 
-### Setup Steps
+The existing `artifacts/model.pkl` is a fitted scikit-learn **Ridge** regressor. Its 626-byte size is normal for this compact linear model. The 3,602-byte `artifacts/preprocessor.pkl` transforms seven input columns into 19 numeric features. Both were serialized with scikit-learn **1.7.2**, pinned in `requirements.txt` alongside the verified numerical libraries. Neither artifact was retrained or modified.
 
-1. **Clone the repository**
-   ```bash
-   git clone https://github.com/akshatkh18/Education-ml-pipeline.git
-   cd Education-ml-pipeline
-   ```
+| Form field | Accepted values |
+| --- | --- |
+| `gender` | female, male |
+| `race_ethnicity` | group A through group E |
+| `parental_level_of_education` | associate's degree, bachelor's degree, high school, master's degree, some college, some high school |
+| `lunch` | free/reduced, standard |
+| `test_preparation_course` | completed, none |
+| `reading_score`, `writing_score` | finite numbers from 0 to 100, including decimals |
 
-2. **Create a virtual environment**
-   ```bash
-   python -m venv venv
-   
-   # On Windows
-   venv\Scripts\activate
-   
-   # On macOS/Linux
-   source venv/bin/activate
-   ```
+The pipeline preserves the training column names and feature order. The web display clamps estimates to 0–100 and rounds to two decimals; raw pipeline estimates remain unchanged. Unknown categories, missing values, NaN, infinity and out-of-range scores are rejected server-side.
 
-3. **Install dependencies**
-   ```bash
-   pip install -r requirements.txt
-   ```
+Artifacts resolve relative to the source file, so startup does not depend on the working directory. Startup loads trusted local pickle files once per worker, rejects scikit-learn version mismatches and runs a sample prediction before serving health checks. Never substitute untrusted pickle files.
 
-4. **Install the package**
-   ```bash
-   pip install -e .
-   ```
+## Routes
 
-## 💻 Usage
+- `GET /`: prediction form.
+- `GET /predictdata`: redirect to the form.
+- `POST /predictdata`: URL-encoded form; renders the result with HTTP 200 or validation errors with HTTP 400. JSON is not an API contract.
+- `GET /healthz`: HTTP 200 with `{"status":"ok"}` after successful startup.
+- Oversized requests return 413; inference failures return a generic 503 and log details server-side.
 
-### Training the Model
+Results are rendered in the POST response, without sessions or cookies. Refreshing a result may prompt the browser to resubmit; use **Start over** for a fresh form. Input values are not persisted by the app. Hosting access logs may record request metadata.
 
-Run the complete pipeline to train the model:
+## Verification
 
-```bash
-python src/pipeline/training_pipeline.py
+```powershell
+.\venv\python.exe -m unittest discover -s tests -v
+.\venv\python.exe -m pip check
 ```
 
-This will:
-- Ingest and validate data
-- Perform feature engineering and transformation
-- Train the machine learning model
-- Save artifacts for deployment
+For a fresh environment, substitute `.\.venv\Scripts\python.exe` (Windows) or `.venv/bin/python` (Linux/macOS). Tests use standard-library `unittest`; no extra test framework is required.
 
-### Making Predictions
+The suite covers artifact checksums, all category choices, score boundaries, invalid and missing inputs, finite outputs, working-directory independence, missing/corrupt artifacts, zero-score rendering, display clamping, safe error messages, HTML escaping, static assets, health checks and actual HTTP GET/POST requests against a temporary localhost server. The HTTP test needs permission to open local sockets.
 
-#### Using the Web Application
+Re-evaluating all 200 rows in the existing `artifacts/test.csv` produced 200 finite predictions (range **3.8700–93.6437**), **R² 0.880567** and **MAE 4.212648**. This is a regression check against the saved test data, not an independent new evaluation; the training code used this test split for model selection. A sample with male, group C, bachelor's degree, standard lunch, completed preparation, reading 75 and writing 80 yields **79.92** on the web page.
 
-1. Start the Flask server:
-   ```bash
-   python app.py
-   ```
+Original SHA-256 checksums:
 
-2. Open your browser and navigate to:
-   ```
-   http://localhost:5000
-   ```
-
-3. Enter the required features and get predictions through the web interface
-
-#### Using the Prediction Pipeline
-
-```python
-from src.pipeline.prediction_pipeline import PredictionPipeline
-
-# Create prediction pipeline instance
-pipeline = PredictionPipeline()
-
-# Make predictions
-results = pipeline.predict(input_data)
+```text
+model.pkl        dee62c8a49a143086b38085eac598a052b73af05bbc101899f9ff03703b63f53
+preprocessor.pkl f07b6f4c0a63731b2523f0005bfcf15394ed592d3be318bec265f2f904c655af
 ```
 
-## 🔧 Pipeline Components
+## Render deployment preparation
 
-### 1. Data Ingestion
-- Loads raw data from various sources
-- Performs initial validation
-- Splits data into training and testing sets
+`render.yaml` configures a Python web service on `feature/flask-deployment`, a pinned Python version, Gunicorn, a health endpoint and automatic deploys disabled. It follows Render's [Flask guide](https://render.com/docs/deploy-flask) and [Blueprint reference](https://render.com/docs/blueprint-spec).
 
-### 2. Data Transformation
-- Handles missing values
-- Encodes categorical variables
-- Scales numerical features
-- Creates feature engineering pipelines
+When you choose to publish later:
 
-### 3. Model Training
-- Trains machine learning models
-- Performs hyperparameter tuning
-- Evaluates model performance
-- Saves the best performing model
+1. Review the local changes and include **both** pickle artifacts in the deployment commit. The model was previously ignored and remains untracked until explicitly added; `.gitignore` now allows these two files. A fresh checkout cannot start without both files. Preserve the three pre-existing deletions separately; do not blindly stage all changes.
+2. Make the reviewed files available on `akshatkh18/End_To_EndML`, branch `feature/flask-deployment`.
+3. Create a Render Blueprint using that repository and branch, or configure a web service manually with the settings below. Review the chosen hosting plan before creating the service.
+4. Verify `/healthz`, the home page and a sample prediction after the deployment you authorize.
 
-### 4. Model Evaluation
-- Generates performance metrics
-- Creates visualization of results
-- Validates model on test data
+Manual settings:
 
-### 5. Deployment
-- Flask web application
-- RESTful API endpoints
-- User-friendly interface
+```text
+Runtime: Python
+Python version: 3.10.15 (PYTHON_VERSION)
+Build: pip install -r requirements.txt
+Start: gunicorn --bind 0.0.0.0:$PORT --workers 2 --threads 2 --timeout 60 --access-logfile - --error-logfile - app:app
+Health check: /healthz
+Automatic deploys: Off
+OMP_NUM_THREADS: 1
+OPENBLAS_NUM_THREADS: 1
+```
 
-## 🛠️ Technology Stack
+Gunicorn runs on Linux/Render and is conditionally excluded from installation on Windows. No database, session secret, persistent disk or training step is required. The app is deployed from the repository root, which must contain `templates/`, `static/` and `artifacts/`; `setup.py` alone is not a standalone web deployment package.
 
-- **Programming Language**: Python 3.8+
-- **Web Framework**: Flask
-- **Machine Learning**: scikit-learn
-- **Data Processing**: Pandas, NumPy
-- **Data Visualization**: Matplotlib, Seaborn
-- **Notebook Environment**: Jupyter Notebook
-- **Version Control**: Git
+No remote push, merge or deployment was performed. Linux/Gunicorn execution and an actual Render build remain to be verified in that environment.
 
-## 📊 Model Performance
+## Project layout and preservation
 
-Performance metrics and evaluation results can be found in the `artifacts/` directory after training. The pipeline tracks:
+- `app.py`: Flask routes, response headers and error handling.
+- `src/pipeline/predict_pipeline.py`: input contract and artifact inference.
+- `templates/home.html`, `static/`: interface.
+- `tests/test_app.py`: model, route and real HTTP tests.
+- `requirements.txt`: pinned serving dependencies.
+- `requirements-training.txt`: optional training/notebook dependencies; unnecessary for deployment.
+- `artifacts/`, `notebook/`: original datasets, saved artifacts and notebooks, preserved.
 
-- Model accuracy
-- Precision and recall
-- F1 score
-- Confusion matrix
-- Feature importance
+The pre-existing deletions of `src/components/__init__.py`, `src/pipeline/__init__.py` and `src/pipeline/train_pipeline.py` were preserved. All three were empty in HEAD. Python namespace imports work without restoring them; package discovery was updated accordingly. Training remains available in the existing components but was not run.
 
-## 🌐 Web Application
-
-The Flask web application provides an intuitive interface for making predictions. Features include:
-
-- Simple input form for feature values
-- Real-time predictions
-- Result visualization
-- Responsive design
-
-### API Endpoints
-
-- `GET /`: Home page with prediction form
-- `POST /predict`: Submit data and receive predictions
-
-## 🤝 Contributing
-
-Contributions are welcome! Here's how you can help:
-
-1. Fork the repository
-2. Create a feature branch (`git checkout -b feature/AmazingFeature`)
-3. Commit your changes (`git commit -m 'Add some AmazingFeature'`)
-4. Push to the branch (`git push origin feature/AmazingFeature`)
-5. Open a Pull Request
-
-### Development Guidelines
-
-- Follow PEP 8 style guidelines
-- Add docstrings to functions and classes
-- Update tests for new features
-- Update documentation as needed
-
-
-
-## 👤 Author
-
-**Akshat Khare**
-
-- GitHub: [@akshatkh18](https://github.com/akshatkh18)
-
-## 🙏 Acknowledgments
-
-- Thanks to all contributors who have helped shape this project
-- Inspired by MLOps best practices and industry standards
-- Built as part of learning and implementing production ML systems
-
-## 📮 Contact
-
-For questions, suggestions, or issues, please open an issue on GitHub or reach out through the repository.
-
----
-
-**Note**: This project is for educational and demonstration purposes. Ensure proper data privacy and security measures when deploying to production environments.
+This is an educational demonstration of historical patterns. Background features can reflect social inequities; predictions should not be used to make admissions, grading or other decisions about students.

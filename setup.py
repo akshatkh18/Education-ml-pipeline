@@ -1,4 +1,4 @@
-from setuptools import find_packages, setup
+from setuptools import find_namespace_packages, setup
 from typing import List 
 
 HYPEN_E_DOT='-e .'
@@ -21,7 +21,7 @@ name='mlproject',
 version='0.0.1',
 author='Akshat',
 author_email='akshatkhandelwal1805@gmail.com',
-packages=find_packages(),
+packages=find_namespace_packages(include=['src', 'src.*']),
 install_requires=get_requirements('requirements.txt')
 )
 

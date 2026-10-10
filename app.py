@@ -1,62 +1,62 @@
-from flask import Flask, request, render_template, redirect, url_for, session
-from src.pipeline.predict_pipeline import CustomData, PredictPipeline
+"""Student performance application and Gunicorn entry point."""
 import os
-
-app = Flask(__name__)
-
-# Needed for session
-app.secret_key = os.urandom(24)
-
-# Load pipeline once (VERY IMPORTANT)
-predict_pipeline = PredictPipeline()
+from flask import Flask, redirect, render_template, request, url_for
+from src.pipeline.predict_pipeline import CATEGORIES, CustomData, PredictPipeline
 
 
-@app.route('/')
-def home():
+def create_app(pipeline=None):
+    app = Flask(__name__)
+    app.config['MAX_CONTENT_LENGTH'] = 16 * 1024
+    app.extensions['predict_pipeline'] = pipeline if pipeline is not None else PredictPipeline()
 
-    result = session.pop('result', None)
-    form_data = session.pop('form_data', None)
+    def page(form_data=None, result=None, errors=None, status=200):
+        return render_template('home.html', categories=CATEGORIES,
+                               form_data=form_data or {}, result=result,
+                               errors=errors or {}), status
 
-    return render_template(
-        'home.html',
-        result=result,
-        form_data=form_data
-    )
+    @app.get('/')
+    def home():
+        return page()
 
-
-@app.route('/predictdata', methods=['POST'])
-def predict_datapoint():
-
-    try:
-
-        # Save form values so they remain after prediction
-        form_data = request.form.to_dict()
-
-        data = CustomData(
-            gender=form_data['gender'],
-            race_ethnicity=form_data['race_ethnicity'],
-            parental_level_of_education=form_data['parental_level_of_education'],
-            lunch=form_data['lunch'],
-            test_preparation_course=form_data['test_preparation_course'],
-            reading_score=float(form_data['reading_score']),
-            writing_score=float(form_data['writing_score']),
-        )
-
-        pred_df = data.get_data_as_data_frame()
-
-        result = predict_pipeline.predict(pred_df)[0]
-
-        # Clamp between 0–100
-        result = round(max(0, min(100, result)), 2)
-
-        session['result'] = result
-        session['form_data'] = form_data
-
+    @app.get('/predictdata')
+    def prediction_form():
         return redirect(url_for('home'))
 
-    except Exception as e:
-        return f"Error occurred: {e}"
+    @app.post('/predictdata')
+    def predict_datapoint():
+        form_data = request.form.to_dict()
+        errors = CustomData.validate(form_data)
+        if errors:
+            return page(form_data, errors=errors, status=400)
+        try:
+            data = CustomData(**{key: form_data[key] for key in CustomData.fields})
+            prediction = app.extensions['predict_pipeline'].predict(data.get_data_as_data_frame())[0]
+            result = round(float(max(0, min(100, prediction))), 2)
+            return page(form_data, result=result)
+        except Exception:
+            app.logger.exception('Prediction failed')
+            return page(form_data, errors={'general': 'Prediction is temporarily unavailable. Please try again.'}, status=503)
+
+    @app.get('/healthz')
+    def health():
+        return {'status': 'ok'}
+
+    @app.errorhandler(413)
+    def too_large(error):
+        return page(errors={'general': 'This request is too large. Please submit only the form fields.'}, status=413)
+
+    @app.after_request
+    def response_headers(response):
+        response.headers['Cache-Control'] = 'no-store'
+        response.headers['X-Content-Type-Options'] = 'nosniff'
+        response.headers['Referrer-Policy'] = 'same-origin'
+        response.headers['Content-Security-Policy'] = "default-src 'self'; style-src 'self'; script-src 'self'; img-src 'self' data:; form-action 'self'; frame-ancestors 'none'; base-uri 'self'"
+        return response
+
+    return app
 
 
-if __name__ == "__main__":
-    app.run(debug=True)
+app = create_app()
+
+if __name__ == '__main__':
+    app.run(host='127.0.0.1', port=int(os.environ.get('PORT', '5000')), debug=False)

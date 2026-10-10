@@ -136,11 +136,13 @@ celerybeat.pid
 
 # ML artifacts
 catboost_info/
-artifacts/
+artifacts/*
 logs/
 
 # Serialized models
 *.pkl
+!artifacts/model.pkl
+!artifacts/preprocessor.pkl
 
 # Environments
 .env
